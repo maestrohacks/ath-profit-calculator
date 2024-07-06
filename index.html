@@ -135,6 +135,31 @@
             opacity: 0;
             transition: opacity 0.3s ease-in-out;
         }
+        .step-input {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .step-label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        #stepSlider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        #stepValue {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        table {
+            table-layout: fixed;
+        }
+        th, td {
+            width: 50%;
+        }
         @media (max-width: 600px) {
             body {
                 padding: 10px;
@@ -171,23 +196,28 @@
         <div id="cryptoInfo"></div>
     </div>
 
+    <div class="step-input">
+        <label for="stepSlider">Шаг изменения просадки: <span id="stepValue">5</span></label>
+        <input type="range" id="stepSlider" min="1" max="10" value="5">
+    </div>
+
     <h2>JavaScript Code:</h2>
-    <pre>
+    <pre id="jsCode">
 const calculateROI = (dropPercentage, allTimeHighPrice = 100) => {
   const buyPrice = allTimeHighPrice * (1 - dropPercentage / 100);
   return ((allTimeHighPrice - buyPrice) / buyPrice * 100).toFixed(2);
 };
 
-const createRange = (start, end) => 
-  Array.from({ length: end - start + 1 }, (_, i) => start + i);
+const createRange = (start, end, step) => 
+  Array.from({ length: Math.floor((end - start) / step) + 1 }, (_, i) => start + i * step);
 
-const generateProfits = (start, end) => 
-  createRange(start, end).map(drop => ({
+const generateProfits = (start, end, step) => 
+  createRange(start, end, step).map(drop => ({
     drop: `${drop}%`,
     profit: `${calculateROI(drop)}%`
   }));
 
-const profits = generateProfits(1, 99);
+const profits = generateProfits(0, 99, 5);
 console.table(profits)
     </pre>
 
@@ -209,29 +239,60 @@ console.table(profits)
             return ((allTimeHighPrice - buyPrice) / buyPrice * 100).toFixed(2);
         };
 
-        const createRange = (start, end) => 
-            Array.from({ length: end - start + 1 }, (_, i) => start + i);
+        const createRange = (start, end, step) => 
+            Array.from({ length: Math.floor((end - start) / step) + 1 }, (_, i) => start + i * step);
 
-        const generateProfits = (start, end) => 
-            createRange(start, end).map(drop => ({
+        const generateProfits = (start, end, step) => 
+            createRange(start, end, step).map(drop => ({
                 drop: `${drop}%`,
                 profit: `${calculateROI(drop)}%`
             }));
 
-        const profits = generateProfits(1, 99);
+        let currentStep = 5;
         
-        const tbody = document.querySelector('#resultsTable tbody');
-        profits.forEach(({ drop, profit }) => {
-            const row = tbody.insertRow();
-            row.insertCell(0).textContent = drop;
-            row.insertCell(1).textContent = profit;
-        });
+        function updateTable() {
+            const profits = generateProfits(0, 99, currentStep);
+            const tbody = document.querySelector('#resultsTable tbody');
+            tbody.innerHTML = '';
+            profits.forEach(({ drop, profit }) => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = drop;
+                row.insertCell(1).textContent = profit;
+            });
+        }
+
+        function updateJSCode() {
+            const jsCode = document.getElementById('jsCode');
+            jsCode.textContent = `
+const calculateROI = (dropPercentage, allTimeHighPrice = 100) => {
+  const buyPrice = allTimeHighPrice * (1 - dropPercentage / 100);
+  return ((allTimeHighPrice - buyPrice) / buyPrice * 100).toFixed(2);
+};
+
+const createRange = (start, end, step) => 
+  Array.from({ length: Math.floor((end - start) / step) + 1 }, (_, i) => start + i * step);
+
+const generateProfits = (start, end, step) => 
+  createRange(start, end, step).map(drop => ({
+    drop: \`\${drop}%\`,
+    profit: \`\${calculateROI(drop)}%\`
+  }));
+
+const profits = generateProfits(0, 99, ${currentStep});
+console.table(profits)
+            `;
+        }
+
+        updateTable();
+        updateJSCode();
 
         const cryptoInput = document.getElementById('cryptoInput');
         const clearInput = document.getElementById('clearInput');
         const suggestions = document.getElementById('suggestions');
         const cryptoInfo = document.getElementById('cryptoInfo');
         const notification = document.getElementById('notification');
+        const stepSlider = document.getElementById('stepSlider');
+        const stepValue = document.getElementById('stepValue');
 
         let timer;
         let debounceTimer;
@@ -316,6 +377,13 @@ console.table(profits)
             cryptoInput.value = '';
             suggestions.style.display = 'none';
             cryptoInfo.innerHTML = '';
+        });
+
+        stepSlider.addEventListener('input', () => {
+            currentStep = parseInt(stepSlider.value);
+            stepValue.textContent = currentStep;
+            updateTable();
+            updateJSCode();
         });
 
         async function selectCrypto(id) {
